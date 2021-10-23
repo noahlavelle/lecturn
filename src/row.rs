@@ -101,6 +101,9 @@ impl Row {
             len: split_length,
         }
     }
+    pub fn find(&self, query: &str) -> Option<usize> {
+        self.string.find(query)
+    }
     pub fn as_bytes(&self) -> &[u8] {
         self.string.as_bytes()
     }

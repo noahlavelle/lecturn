@@ -40,7 +40,7 @@ impl StatusMessage {
 pub struct Editor {
     pub should_quit: bool,
     terminal: Terminal,
-    cursor_position: Position,
+    pub(crate) cursor_position: Position,
     offset: Position,
     pub document: Document,
     pub status_message: StatusMessage,
@@ -91,7 +91,7 @@ impl Editor {
         }
     }
 
-    fn refresh_screen(&self) -> Result<(), std::io::Error> {
+    pub(crate) fn refresh_screen(&self) -> Result<(), std::io::Error> {
         Terminal::cursor_hide();
         Terminal::cursor_position(&Position::default());
         if self.should_quit {
@@ -143,11 +143,12 @@ impl Editor {
                             }
                             let command_name = command_name.unwrap();
                             let is_forced = command_name.contains("!");
-                            let command = self.command_handler.get_command(command_name);
+                            let command = self.command_handler.get_command(&command_name);
+                            let command_params = command.unwrap().regex.replace(&command_name.to_string(), "").to_string();
                             if command.is_none() {
                                 self.status_message = StatusMessage::from("Invalid command.".to_string());
                             } else {
-                                (command.unwrap().function)(self, is_forced);
+                                (command.unwrap().function)(self, command_params.split(" ").collect(), is_forced);
                             }
                         },
                         _ => (),
@@ -181,7 +182,7 @@ impl Editor {
         }
         Ok(())
     }
-    fn scroll(&mut self) {
+    pub(crate) fn scroll(&mut self) {
         let Position { x, y } = self.cursor_position;
         let width = self.terminal.size().width as usize;
         let height = self.terminal.size().height as usize;

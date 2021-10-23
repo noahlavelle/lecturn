@@ -90,6 +90,15 @@ impl Document {
         }
         Ok(())
     }
+    pub fn find(&self, query: &str) -> Vec<Position> {
+        let mut positions: Vec<Position> = vec!();
+        for i in 0..self.len() {
+            if let Some(position) = self.row(i).unwrap().find(query) {
+                positions.push(Position{x: position, y: i});
+            }
+        }
+        positions
+    }
     pub fn is_dirty(&self) -> bool {
         self.dirty
     }
