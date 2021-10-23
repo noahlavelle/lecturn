@@ -142,16 +142,16 @@ impl Editor {
                         Key::Char(':') => {
                             let command_name = self.prompt(":").unwrap_or(None);
                             if command_name.is_none() {
-                                self.status_message = StatusMessage::from("Command aborted.".to_string(), Option::from(crate::ERROR_COLOR));
+                                self.status_message = StatusMessage::from("ERR: Command aborted".to_string(), Option::from(crate::ERROR_COLOR));
                                 return Ok(());
                             }
                             let command_name = command_name.unwrap();
                             let is_forced = command_name.contains("!");
                             let command = self.command_handler.get_command(&command_name);
-                            let command_params = command.unwrap().regex.replace(&command_name.to_string(), "").to_string();
                             if command.is_none() {
-                                self.status_message = StatusMessage::from("Invalid command.".to_string(), Option::from(crate::ERROR_COLOR));
+                                self.status_message = StatusMessage::from("ERR: Invalid command".to_string(), Option::from(crate::ERROR_COLOR));
                             } else {
+                                let command_params = command.unwrap().regex.replace(&command_name.to_string(), "").to_string();
                                 (command.unwrap().function)(self, command_params.split(" ").collect(), is_forced);
                             }
                         },
