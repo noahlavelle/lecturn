@@ -14,7 +14,7 @@ impl Document {
         rows.push(Row::default());
         Self {
             rows,
-            file_name: Option::from("".to_string()),
+            file_name: None,
             dirty: false,
         }
     }

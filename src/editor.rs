@@ -8,7 +8,7 @@ use termion::color;
 use termion::color::Rgb;
 use termion::event::Key;
 
-const STATUS_FG_COLOR: color::Rgb = color::Rgb(63, 63, 63);
+const STATUS_FG_COLOR: color::Rgb = color::Rgb(0, 0, 0);
 const STATUS_BG_COLOR: color::Rgb = color::Rgb(239, 239, 239);
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 const QUIT_TIMES: u8 = 3;
@@ -50,6 +50,7 @@ pub struct Editor {
     quit_times: u8,
     interaction_mode: InteractionMode,
     command_handler: Commands,
+    just_entered: bool,
 }
 
 impl Editor {
@@ -93,6 +94,7 @@ impl Editor {
             quit_times: QUIT_TIMES,
             interaction_mode: InteractionMode::Command,
             command_handler: Commands::default(),
+            just_entered: true,
         }
     }
 
@@ -143,6 +145,7 @@ impl Editor {
                 if self.interaction_mode == InteractionMode::Command {
                     match pressed_key {
                         Key::Char('i') => {
+                            self.just_entered = false;
                             self.interaction_mode = InteractionMode::Insert;
                             Terminal::cursor_bar();
                         }
@@ -305,7 +308,7 @@ impl Editor {
                 .row(self.offset.y.saturating_add(terminal_row as usize))
             {
                 self.draw_row(row);
-            } else if self.document.is_empty() && terminal_row == height / 3 {
+            } else if self.document.is_empty() && terminal_row == height / 3 && self.just_entered {
                 self.draw_welcome_message();
             } else {
                 Terminal::set_fg_color(color::Rgb(59, 120, 255));
@@ -328,21 +331,20 @@ impl Editor {
             file_name.truncate(20);
         }
         status = format!(
-            "{} - {} lines{}",
+            "{}{}",
             file_name,
-            self.document.len(),
             modified_indicator
         );
 
-        let line_indicator = format!(
-            "{}/{}",
+        let position_indicator = format!(
+            "{},{}",
             self.cursor_position.y.saturating_add(1),
-            self.document.len(),
+            self.cursor_position.x.saturating_add(1),
         );
         #[allow(clippy::integer_arithmetic)]
-        let len = status.len() + line_indicator.len();
+        let len = status.len() + position_indicator.len();
         status.push_str(&" ".repeat(width.saturating_sub(len)));
-        status = format!("{}{}", status, line_indicator);
+        status = format!("{}{}", status, position_indicator);
         status.truncate(width);
         Terminal::set_bg_color(STATUS_BG_COLOR);
         Terminal::set_fg_color(STATUS_FG_COLOR);
@@ -354,6 +356,8 @@ impl Editor {
         Terminal::clear_current_line();
         if self.interaction_mode == InteractionMode::Insert {
             self.status_message = StatusMessage::from("-- INSERT --".to_string(), None);
+        } else if self.status_message.text == "-- INSERT --".to_string() {
+            self.status_message = StatusMessage::from("".to_string(), None);
         }
 
         let message = &self.status_message;
@@ -363,8 +367,10 @@ impl Editor {
             if !message.color.is_none() {
                 Terminal::set_bg_color(message.color.unwrap());
             }
+            Terminal::set_fg_color(color::Rgb(255, 255, 255));
             print!("{}", text);
             Terminal::reset_bg_color();
+            Terminal::reset_fg_color();
         }
     }
     fn prompt(&mut self, prompt: &str) -> Result<Option<String>, std::io::Error> {
