@@ -54,6 +54,7 @@ pub struct Editor {
 
 impl Editor {
     pub fn run(&mut self) {
+        Terminal::cursor_block();
         loop {
             if let Err(error) = self.refresh_screen() {
                 die(error);
@@ -95,7 +96,7 @@ impl Editor {
         }
     }
 
-    pub(crate) fn refresh_screen(&self) -> Result<(), std::io::Error> {
+    pub(crate) fn refresh_screen(&mut self) -> Result<(), std::io::Error> {
         Terminal::cursor_hide();
         Terminal::cursor_position(&Position::default());
         if self.should_quit {
@@ -134,11 +135,17 @@ impl Editor {
     fn process_keypress(&mut self) -> Result<(), std::io::Error> {
         let pressed_key = Terminal::read_key()?;
         match pressed_key {
-            Key::Esc => self.interaction_mode = InteractionMode::Command,
+            Key::Esc => {
+                self.interaction_mode = InteractionMode::Command;
+                Terminal::cursor_block();
+            }
             Key::Char(c) => {
                 if self.interaction_mode == InteractionMode::Command {
                     match pressed_key {
-                        Key::Char('i') => self.interaction_mode = InteractionMode::Insert,
+                        Key::Char('i') => {
+                            self.interaction_mode = InteractionMode::Insert;
+                            Terminal::cursor_bar();
+                        }
                         Key::Char(':') => {
                             let command_name = self.prompt(":").unwrap_or(None);
                             if command_name.is_none() {
@@ -311,11 +318,11 @@ impl Editor {
         let mut status;
         let width = self.terminal.size().width as usize;
         let modified_indicator = if self.document.is_dirty() {
-            " (modified)"
+            " [+]"
         } else {
             ""
         };
-        let mut file_name = "[New File]".to_string();
+        let mut file_name = "[No Name]".to_string();
         if let Some(name) = &self.document.file_name {
             file_name = name.clone();
             file_name.truncate(20);
@@ -343,8 +350,12 @@ impl Editor {
         Terminal::reset_fg_color();
         Terminal::reset_bg_color();
     }
-    fn draw_message_bar(&self) {
+    fn draw_message_bar(&mut self) {
         Terminal::clear_current_line();
+        if self.interaction_mode == InteractionMode::Insert {
+            self.status_message = StatusMessage::from("-- INSERT --".to_string(), None);
+        }
+
         let message = &self.status_message;
         if Instant::now() - message.time < Duration::new(5, 0) {
             let mut text = message.text.clone();

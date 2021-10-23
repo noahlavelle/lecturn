@@ -2,7 +2,6 @@ use crate::{Position, Row};
 use std::fs;
 use std::io::{Write, Error};
 
-#[derive(Default)]
 pub struct Document {
     rows: Vec<Row>,
     pub file_name: Option<String>,
@@ -10,6 +9,16 @@ pub struct Document {
 }
 
 impl Document {
+    pub fn default() -> Self {
+        let mut rows = vec!();
+        rows.push(Row::default());
+        Self {
+            rows,
+            file_name: Option::from("".to_string()),
+            dirty: false,
+        }
+    }
+
     pub fn open(filename: &str) -> Result<Self, Error> {
         let contents = fs::read_to_string(filename)?;
         let mut rows = Vec::new();
@@ -26,7 +35,7 @@ impl Document {
         self.rows.get(index)
     }
     pub fn is_empty(&self) -> bool {
-        self.rows.is_empty()
+        self.rows.len() == 1 && self.row(0).unwrap().is_empty()
     }
     pub fn len(&self) -> usize {
         self.rows.len()

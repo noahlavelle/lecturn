@@ -58,6 +58,12 @@ impl Terminal {
     pub fn cursor_show() {
         print!("{}", termion::cursor::Show);
     }
+    pub fn cursor_bar() {
+        print!("{}", termion::cursor::BlinkingBar);
+    }
+    pub fn cursor_block() {
+        print!("{}", termion::cursor::BlinkingBlock);
+    }
     pub fn clear_current_line() {
         print!("{}", termion::clear::CurrentLine);
     }
