@@ -22,7 +22,7 @@ impl Commands {
                 description: "Quits Editor".to_string(),
                 function: |mut editor, _params, forced| {
                     if editor.document.is_dirty() && !forced {
-                        editor.status_message = StatusMessage::from("There are unsaved changes. Run :q! to force quit".to_string());
+                        editor.status_message = StatusMessage::from("There are unsaved changes. Run :q! to force quit".to_string(), Option::from(crate::ERROR_COLOR));
                         return;
                     }
                     editor.should_quit = true
@@ -66,14 +66,14 @@ impl Commands {
         }
     }
     pub fn search_command(editor: &mut Editor, query: &str, reverse: bool) {
-        let mut positions: Vec<Position> = editor.document.find(query);
+        let positions: Vec<Position> = editor.document.find(query);
         let mut i: i8 = if reverse { positions.len() - 1 } else { 0 } as i8;
         if positions.is_empty() {
-            editor.status_message = StatusMessage::from("No results found".to_string());
+            editor.status_message = StatusMessage::from("No results found".to_string(), Option::from(crate::ERROR_COLOR));
             return;
         }
         loop {
-            editor.status_message = StatusMessage::from(format!("Search Mode - {}/{} (navigate = n / N)", i + 1, positions.len()));
+            editor.status_message = StatusMessage::from(format!("Search Mode - {}/{} (navigate = n / N)", i + 1, positions.len()), None);
             if let Some(position) = positions.get(i as usize) {
                 editor.cursor_position = Position{ x: position.x, y: position.y };
                 let _ = editor.refresh_screen();
@@ -92,7 +92,7 @@ impl Commands {
             }
             i = i.clamp(0, (positions.len() - 1) as i8)
         }
-        editor.status_message = StatusMessage::from("".to_string());
+        editor.status_message = StatusMessage::from("".to_string(), None);
     }
     pub fn get_command(&self, command_name: &String) -> Option<&Command> {
         let mut command: Option<&Command> = None;

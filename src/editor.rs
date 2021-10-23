@@ -5,6 +5,7 @@ use std::env;
 use std::time::Duration;
 use std::time::Instant;
 use termion::color;
+use termion::color::Rgb;
 use termion::event::Key;
 
 const STATUS_FG_COLOR: color::Rgb = color::Rgb(63, 63, 63);
@@ -27,12 +28,14 @@ pub struct Position {
 pub struct StatusMessage {
     text: String,
     time: Instant,
+    color: Option<Rgb>,
 }
 impl StatusMessage {
-    pub fn from(message: String) -> Self {
+    pub fn from(message: String, color: Option<Rgb>) -> Self {
         Self {
             time: Instant::now(),
             text: message,
+            color,
         }
     }
 }
@@ -65,13 +68,14 @@ impl Editor {
     }
     pub fn default() -> Self {
         let args: Vec<String> = env::args().collect();
-        let mut initial_status = String::from("HELP: Ctrl-s = save | Ctrl-Q = quit");
+        let mut initial_status = StatusMessage::from("".to_string(), None);
         let document = if let Some(file_name) = args.get(1) {
             let doc = Document::open(file_name);
             if let Ok(doc) = doc {
                 doc
             } else {
-                initial_status = format!("ERR: Could not open file: {}", file_name);
+                initial_status.text = format!("ERR: Could not open file: {}", file_name);
+                initial_status.color = Option::from(crate::ERROR_COLOR);
                 Document::default()
             }
         } else {
@@ -84,7 +88,7 @@ impl Editor {
             document,
             cursor_position: Position::default(),
             offset: Position::default(),
-            status_message: StatusMessage::from(initial_status),
+            status_message: initial_status,
             quit_times: QUIT_TIMES,
             interaction_mode: InteractionMode::Command,
             command_handler: Commands::default(),
@@ -113,17 +117,17 @@ impl Editor {
         if self.document.file_name.is_none() {
             let new_name = self.prompt("Save as: ").unwrap_or(None);
             if new_name.is_none() {
-                self.status_message = StatusMessage::from("Save aborted.".to_string());
+                self.status_message = StatusMessage::from("Save aborted.".to_string(), Option::from(crate::ERROR_COLOR));
                 return false;
             }
             self.document.file_name = new_name;
         }
 
         return if self.document.save().is_ok() {
-            self.status_message = StatusMessage::from("File saved successfully".to_string());
+            self.status_message = StatusMessage::from("File saved successfully".to_string(), None);
             true
         } else {
-            self.status_message = StatusMessage::from("Error writing to file!".to_string());
+            self.status_message = StatusMessage::from("ERR: could not write to file".to_string(), Option::from(crate::ERROR_COLOR));
             false
         }
     }
@@ -138,7 +142,7 @@ impl Editor {
                         Key::Char(':') => {
                             let command_name = self.prompt(":").unwrap_or(None);
                             if command_name.is_none() {
-                                self.status_message = StatusMessage::from("Command aborted.".to_string());
+                                self.status_message = StatusMessage::from("Command aborted.".to_string(), Option::from(crate::ERROR_COLOR));
                                 return Ok(());
                             }
                             let command_name = command_name.unwrap();
@@ -146,7 +150,7 @@ impl Editor {
                             let command = self.command_handler.get_command(&command_name);
                             let command_params = command.unwrap().regex.replace(&command_name.to_string(), "").to_string();
                             if command.is_none() {
-                                self.status_message = StatusMessage::from("Invalid command.".to_string());
+                                self.status_message = StatusMessage::from("Invalid command.".to_string(), Option::from(crate::ERROR_COLOR));
                             } else {
                                 (command.unwrap().function)(self, command_params.split(" ").collect(), is_forced);
                             }
@@ -178,7 +182,7 @@ impl Editor {
         self.scroll();
         if self.quit_times < QUIT_TIMES {
             self.quit_times = QUIT_TIMES;
-            self.status_message = StatusMessage::from(String::new());
+            self.status_message = StatusMessage::from(String::new(), None);
         }
         Ok(())
     }
@@ -270,8 +274,11 @@ impl Editor {
         #[allow(clippy::integer_arithmetic, clippy::integer_division)]
         let padding = width.saturating_sub(len) / 2;
         let spaces = " ".repeat(padding.saturating_sub(1));
-        welcome_message = format!("~{}{}", spaces, welcome_message);
+        welcome_message = format!("{}{}", spaces, welcome_message);
         welcome_message.truncate(width);
+        Terminal::set_fg_color(color::Rgb(59, 120, 255));
+        print!("~");
+        Terminal::reset_fg_color();
         println!("{}\r", welcome_message);
     }
     pub fn draw_row(&self, row: &Row) {
@@ -294,7 +301,9 @@ impl Editor {
             } else if self.document.is_empty() && terminal_row == height / 3 {
                 self.draw_welcome_message();
             } else {
+                Terminal::set_fg_color(color::Rgb(59, 120, 255));
                 println!("~\r");
+                Terminal::reset_fg_color();
             }
         }
     }
@@ -340,13 +349,17 @@ impl Editor {
         if Instant::now() - message.time < Duration::new(5, 0) {
             let mut text = message.text.clone();
             text.truncate(self.terminal.size().width as usize);
+            if !message.color.is_none() {
+                Terminal::set_bg_color(message.color.unwrap());
+            }
             print!("{}", text);
+            Terminal::reset_bg_color();
         }
     }
     fn prompt(&mut self, prompt: &str) -> Result<Option<String>, std::io::Error> {
         let mut result = String::new();
         loop {
-            self.status_message = StatusMessage::from(format!("{}{}", prompt, result));
+            self.status_message = StatusMessage::from(format!("{}{}", prompt, result), None);
             self.refresh_screen()?;
             match Terminal::read_key()? {
                 Key::Backspace => {
@@ -367,7 +380,7 @@ impl Editor {
                 _ => (),
             }
         }
-        self.status_message = StatusMessage::from(String::new());
+        self.status_message = StatusMessage::from(String::new(), None);
         if result.is_empty() {
             return Ok(None);
         }

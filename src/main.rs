@@ -12,12 +12,16 @@ mod editor;
 mod row;
 mod terminal;
 mod commands;
+
+use termion::color;
 pub use document::Document;
 use editor::Editor;
 pub use editor::Position;
 pub use row::Row;
 pub use terminal::Terminal;
 pub use commands::Commands;
+
+pub const ERROR_COLOR: color::Rgb = color::Rgb(197, 15, 31);
 
 fn main() {
     Editor::default().run();
