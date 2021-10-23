@@ -11,11 +11,13 @@ mod document;
 mod editor;
 mod row;
 mod terminal;
+mod commands;
 pub use document::Document;
 use editor::Editor;
 pub use editor::Position;
 pub use row::Row;
 pub use terminal::Terminal;
+pub use commands::Commands;
 
 fn main() {
     Editor::default().run();

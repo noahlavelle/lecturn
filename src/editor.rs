@@ -1,4 +1,4 @@
-use crate::Document;
+use crate::{Commands, Document};
 use crate::Row;
 use crate::Terminal;
 use std::env;
@@ -12,18 +12,24 @@ const STATUS_BG_COLOR: color::Rgb = color::Rgb(239, 239, 239);
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 const QUIT_TIMES: u8 = 3;
 
+#[derive(PartialEq, Eq)]
+enum InteractionMode {
+    Command,
+    Insert,
+}
+
 #[derive(Default)]
 pub struct Position {
     pub x: usize,
     pub y: usize,
 }
 
-struct StatusMessage {
+pub struct StatusMessage {
     text: String,
     time: Instant,
 }
 impl StatusMessage {
-    fn from(message: String) -> Self {
+    pub fn from(message: String) -> Self {
         Self {
             time: Instant::now(),
             text: message,
@@ -32,13 +38,15 @@ impl StatusMessage {
 }
 
 pub struct Editor {
-    should_quit: bool,
+    pub should_quit: bool,
     terminal: Terminal,
     cursor_position: Position,
     offset: Position,
-    document: Document,
-    status_message: StatusMessage,
+    pub document: Document,
+    pub status_message: StatusMessage,
     quit_times: u8,
+    interaction_mode: InteractionMode,
+    command_handler: Commands,
 }
 
 impl Editor {
@@ -78,6 +86,8 @@ impl Editor {
             offset: Position::default(),
             status_message: StatusMessage::from(initial_status),
             quit_times: QUIT_TIMES,
+            interaction_mode: InteractionMode::Command,
+            command_handler: Commands::default(),
         }
     }
 
@@ -99,40 +109,53 @@ impl Editor {
         Terminal::cursor_show();
         Terminal::flush()
     }
-    fn save(&mut self) {
+    pub fn save(&mut self) -> bool {
         if self.document.file_name.is_none() {
             let new_name = self.prompt("Save as: ").unwrap_or(None);
             if new_name.is_none() {
                 self.status_message = StatusMessage::from("Save aborted.".to_string());
-                return;
+                return false;
             }
             self.document.file_name = new_name;
         }
 
-        if self.document.save().is_ok() {
+        return if self.document.save().is_ok() {
             self.status_message = StatusMessage::from("File saved successfully".to_string());
+            true
         } else {
             self.status_message = StatusMessage::from("Error writing to file!".to_string());
+            false
         }
     }
     fn process_keypress(&mut self) -> Result<(), std::io::Error> {
         let pressed_key = Terminal::read_key()?;
         match pressed_key {
-            Key::Ctrl('q') => {
-                if self.quit_times > 0 && self.document.is_dirty() {
-                    self.status_message = StatusMessage::from(format!(
-                        "WARNING! File has unsaved changes. Press Ctrl-Q {} more times to quit.",
-                        self.quit_times
-                    ));
-                    self.quit_times -= 1;
-                    return Ok(());
-                }
-                self.should_quit = true;
-            }
-            Key::Ctrl('s') => self.save(),
+            Key::Esc => self.interaction_mode = InteractionMode::Command,
             Key::Char(c) => {
-                self.document.insert(&self.cursor_position, c);
-                self.move_cursor(Key::Right);
+                if self.interaction_mode == InteractionMode::Command {
+                    match pressed_key {
+                        Key::Char('i') => self.interaction_mode = InteractionMode::Insert,
+                        Key::Char(':') => {
+                            let command_name = self.prompt(":").unwrap_or(None);
+                            if command_name.is_none() {
+                                self.status_message = StatusMessage::from("Command aborted.".to_string());
+                                return Ok(());
+                            }
+                            let command_name = command_name.unwrap();
+                            let is_forced = command_name.contains("!");
+                            let command = self.command_handler.get_command(command_name);
+                            if command.is_none() {
+                                self.status_message = StatusMessage::from("Invalid command.".to_string());
+                            } else {
+                                (command.unwrap().function)(self, is_forced);
+                            }
+                        },
+                        _ => (),
+                    }
+                } else {
+                    self.document.insert(&self.cursor_position, c);
+                    self.move_cursor(Key::Right);
+                }
             },
             Key::Delete => self.document.delete(&self.cursor_position),
             Key::Backspace => {
