@@ -34,6 +34,9 @@ impl Document {
     pub fn row(&self, index: usize) -> Option<&Row> {
         self.rows.get(index)
     }
+    pub fn row_mut(&mut self, index: usize) -> Option<&mut Row> {
+        self.rows.get_mut(index)
+    }
     pub fn is_empty(&self) -> bool {
         self.rows.len() == 1 && self.row(0).unwrap().is_empty()
     }
@@ -110,5 +113,10 @@ impl Document {
     }
     pub fn is_dirty(&self) -> bool {
         self.dirty
+    }
+    pub fn reset_highlighting(&mut self) {
+        for i in 0..self.rows.len() {
+            self.row_mut(i).unwrap().reset_highlighting();
+        }
     }
 }

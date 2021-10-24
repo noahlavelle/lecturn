@@ -1,6 +1,6 @@
 use regex::{Regex};
 use crate::editor::{Editor, StatusMessage};
-use crate::{Position, Terminal};
+use crate::{HighlightType, Position, Terminal};
 use termion::event::Key;
 
 pub struct Command {
@@ -66,32 +66,59 @@ impl Commands {
         }
     }
     pub fn search_command(editor: &mut Editor, query: &str, reverse: bool) {
+        Terminal::cursor_hide();
         let positions: Vec<Position> = editor.document.find(query);
         let mut i: i8 = if reverse { positions.len() - 1 } else { 0 } as i8;
+        let mut direction_just_jumped = 1;
         if positions.is_empty() {
             editor.status_message = StatusMessage::from("No results found".to_string(), Option::from(crate::ERROR_COLOR));
             return;
         }
+
         loop {
-            editor.status_message = StatusMessage::from(format!("Search Mode - {}/{} (navigate = n / N)", i + 1, positions.len()), None);
+            editor.status_message = StatusMessage::from(format!("Search Mode - {}/{} (navigate = n / N)", i + 1, &positions.len()), None);
             if let Some(position) = positions.get(i as usize) {
-                editor.cursor_position = Position{ x: position.x, y: position.y };
+                let y: usize;
+                if direction_just_jumped == 1 {
+                   y = position.y + ((editor.terminal.size().height / 2) as usize);
+                } else {
+                    y = position.y - ((editor.terminal.size().height / 2) as usize);
+                }
+                editor.cursor_position = Position{ x: position.x, y };
+                Editor::scroll(editor);
+
+                for p in &positions {
+                    let row = editor.document.row_mut(p.y).unwrap();
+                    for c in (p.x)..(p.x + query.len()) {
+                        if p.y == position.y as usize {
+                            row.add_highlighting(HighlightType::SearchSelected, c);
+                        } else {
+                            row.add_highlighting(HighlightType::Search, c);
+                        }
+
+                    }
+                }
+
                 let _ = editor.refresh_screen();
+                editor.document.reset_highlighting();
             }
 
             match Terminal::read_key().unwrap() {
                 Key::Char('n') => {
                     i -= 1;
+                    direction_just_jumped = -1;
                 }
                 Key::Char('N') => {
                     i += 1;
+                    direction_just_jumped = 1;
                 }
                 Key::Char('\n') => break,
                 Key::Esc => break,
                 _ => (),
             }
-            i = i.clamp(0, (positions.len() - 1) as i8)
+            i = i.clamp(0, positions.len() as i8 - 1);
         }
+        Terminal::cursor_show();
         editor.status_message = StatusMessage::from("".to_string(), None);
     }
     pub fn get_command(&self, command_name: &String) -> Option<&Command> {

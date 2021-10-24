@@ -42,7 +42,7 @@ impl StatusMessage {
 
 pub struct Editor {
     pub should_quit: bool,
-    terminal: Terminal,
+    pub terminal: Terminal,
     pub(crate) cursor_position: Position,
     offset: Position,
     pub document: Document,
@@ -108,6 +108,8 @@ impl Editor {
             self.draw_rows();
             self.draw_status_bar();
             self.draw_message_bar();
+            self.document.reset_highlighting();
+
             Terminal::cursor_position(&Position {
                 x: self.cursor_position.x.saturating_sub(self.offset.x),
                 y: self.cursor_position.y.saturating_sub(self.offset.y),
@@ -308,6 +310,7 @@ impl Editor {
                 .row(self.offset.y.saturating_add(terminal_row as usize))
             {
                 self.draw_row(row);
+
             } else if self.document.is_empty() && terminal_row == height / 3 && self.just_entered {
                 self.draw_welcome_message();
             } else {
