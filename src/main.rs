@@ -31,19 +31,7 @@ fn main() {
 
 /*
 TODO (GENERAL IDEAS):
-    - Add VIM style commands section using the prompt functionality
     - Add customisable colors
     - Add customisable syntax highlighting
-    - Add more navigation features (search, goto, etc)
- */
-
-/*
-TODO (VIM LIKE COMMANDS):
-    - Modular commands system
-    - Each script placed in a directory is auto loaded
-    - A struct defines the command name and description]
-    - There is an execution function that can interface with the document and editor functions
-    - Allows for VIM like commands
-    - Also load .rs scripts from a folder in home directory to allow for modding
-    - .rs scripts can also color certain things by hooking into an syntax highlighter system
+    - Add more navigation features (goto, etc)
  */

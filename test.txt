@@ -1,8 +1,0 @@
-hello everyone
-hello a
-hello a
-hello a
-hello a
-bye a
-bye a
-hello a

@@ -2,7 +2,7 @@
 <project version="4">
   <component name="ProjectModuleManager">
     <modules>
-      <module fileurl="file://$PROJECT_DIR$/.idea/hecto.iml" filepath="$PROJECT_DIR$/.idea/hecto.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/lecturn.iml" filepath="$PROJECT_DIR$/.idea/lecturn.iml" />
     </modules>
   </component>
 </project>

@@ -1,7 +1,15 @@
 [package]
-name = "hecto"
+name = "lecturn"
 version = "0.1.0"
 edition = "2018"
+authors = ["Noah Lavelle <noah.lavelle@gmail.com>"]
+license = "MIT OR Apache-2.0"
+description = "A terminal text editor"
+readme = "README.md"
+homepage = "https://github.com/NoahLavelle/lecturn"
+repository = "https://github.com/NoahLavelle/lecturn"
+keywords = ["terminal", "text", "cli"]
+categories = ["command-line-utilities"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
