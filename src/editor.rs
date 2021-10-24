@@ -112,8 +112,8 @@ impl Editor {
             self.document.reset_highlighting();
 
             Terminal::cursor_position(&Position {
-                x: self.cursor_position.x.saturating_sub(self.offset.x),
-                y: self.cursor_position.y.saturating_sub(self.offset.y),
+                x: self.cursor_position.x.saturating_sub(self.offset.x) + self.document.len().to_string().len() + 1,
+                y: self.cursor_position.y.saturating_sub(self.offset.y).clamp(0, self.document.len() - 1),
             });
         }
         Terminal::cursor_show();
@@ -184,6 +184,12 @@ impl Editor {
                             }
 
                         }
+                        // Navigation
+                        Key::Char('k') => self.move_cursor(Key::Up),
+                        Key::Char('j') => self.move_cursor(Key::Down),
+                        Key::Char('l') => self.move_cursor(Key::Right),
+                        Key::Char('h') => self.move_cursor(Key::Left),
+                        Key::Char('H') => self.cursor_position.y = self.offset.y,
                         _ => (),
                     }
                 } else {
@@ -305,9 +311,6 @@ impl Editor {
         let spaces = " ".repeat(padding.saturating_sub(1));
         welcome_message = format!("{}{}", spaces, welcome_message);
         welcome_message.truncate(width);
-        Terminal::set_fg_color(color::Rgb(59, 120, 255));
-        print!("~");
-        Terminal::reset_fg_color();
         println!("{}\r", welcome_message);
     }
     pub fn draw_row(&self, row: &Row) {
@@ -326,14 +329,16 @@ impl Editor {
                 .document
                 .row(self.offset.y.saturating_add(terminal_row as usize))
             {
+                Terminal::set_fg_color(Rgb(249, 241, 165));
+                let line_number = self.offset.y.saturating_add(terminal_row as usize + 1);
+                print!("{}{} ", " ".repeat(self.document.len().to_string().len() - line_number.to_string().len()), line_number);
+                Terminal::reset_fg_color();
                 self.draw_row(row);
 
             } else if self.document.is_empty() && terminal_row == height / 3 && self.just_entered {
                 self.draw_welcome_message();
             } else {
-                Terminal::set_fg_color(color::Rgb(59, 120, 255));
-                println!("~\r");
-                Terminal::reset_fg_color();
+                println!();
             }
         }
     }
