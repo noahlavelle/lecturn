@@ -14,8 +14,9 @@ const VERSION: &str = env!("CARGO_PKG_VERSION");
 const QUIT_TIMES: u8 = 3;
 
 #[derive(PartialEq, Eq)]
-enum InteractionMode {
+pub enum InteractionMode {
     Command,
+    Search,
     Insert,
 }
 
@@ -48,7 +49,7 @@ pub struct Editor {
     pub document: Document,
     pub status_message: StatusMessage,
     quit_times: u8,
-    interaction_mode: InteractionMode,
+    pub interaction_mode: InteractionMode,
     command_handler: Commands,
     just_entered: bool,
 }
@@ -120,7 +121,7 @@ impl Editor {
     }
     pub fn save(&mut self) -> bool {
         if self.document.file_name.is_none() {
-            let new_name = self.prompt("Save as: ").unwrap_or(None);
+            let new_name = self.prompt("Save as: ", |_, _|{}).unwrap_or(None);
             if new_name.is_none() {
                 self.status_message = StatusMessage::from("Save aborted.".to_string(), Option::from(crate::ERROR_COLOR));
                 return false;
@@ -152,7 +153,7 @@ impl Editor {
                             Terminal::cursor_bar();
                         }
                         Key::Char(':') => {
-                            let command_name = self.prompt(":").unwrap_or(None);
+                            let command_name = self.prompt(":", |_, _|{}).unwrap_or(None);
                             if command_name.is_none() {
                                 self.status_message = StatusMessage::from("ERR: Command aborted".to_string(), Option::from(crate::ERROR_COLOR));
                                 return Ok(());
@@ -167,6 +168,22 @@ impl Editor {
                                 (command.unwrap().function)(self, command_params.split(" ").collect(), is_forced);
                             }
                         },
+                        Key::Char('/') => {
+                            self.just_entered = false;
+                            self.interaction_mode = InteractionMode::Search;
+                            let mut query = String::new();
+                            self.prompt("/", |editor, result| {
+                                query = result.clone();
+                                Commands::search_command(editor, result, false, true);
+                            })?;
+                            if self.interaction_mode == InteractionMode::Command {
+                                self.status_message = StatusMessage::from("ERR: Search Aborted".to_string(), Option::from(crate::ERROR_COLOR));
+                            } else {
+                                self.interaction_mode = InteractionMode::Command;
+                                Commands::search_command(self, &query, false, false);
+                            }
+
+                        }
                         _ => (),
                     }
                 } else {
@@ -376,11 +393,16 @@ impl Editor {
             Terminal::reset_fg_color();
         }
     }
-    fn prompt(&mut self, prompt: &str) -> Result<Option<String>, std::io::Error> {
+    fn prompt<C>(&mut self, prompt: &str, mut callback: C) -> Result<Option<String>, std::io::Error>
+    where
+        C: FnMut(&mut Self, &String)
+    {
         let mut result = String::new();
         loop {
             self.status_message = StatusMessage::from(format!("{}{}", prompt, result), None);
+            callback(self, &result);
             self.refresh_screen()?;
+
             match Terminal::read_key()? {
                 Key::Backspace => {
                     if !result.is_empty() {
@@ -395,6 +417,7 @@ impl Editor {
                 }
                 Key::Esc => {
                     result.truncate(0);
+                    self.interaction_mode = InteractionMode::Command;
                     break;
                 }
                 _ => (),

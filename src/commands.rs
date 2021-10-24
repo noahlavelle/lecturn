@@ -28,8 +28,8 @@ impl Commands {
                     editor.should_quit = true
                 },
             },
-             Command {
-             regex: Regex::new(r#"\b(w)\b"#).unwrap(),
+            Command {
+                regex: Regex::new(r#"\b(w)\b"#).unwrap(),
                 name: "w".to_string(),
                 description: "Saves current document".to_string(),
                 function: |editor, _params, _forced| {
@@ -49,7 +49,7 @@ impl Commands {
                 name: "/".to_string(),
                 description: "Searches document (top -> bottom)".to_string(),
                 function: |editor, params, _forced| {
-                    Commands::search_command(editor, params[0], false);
+                    Commands::search_command(editor, &params.join(" "), false, false);
                 },
             },
             Command {
@@ -57,7 +57,7 @@ impl Commands {
                 name: "?".to_string(),
                 description: "Searches document (bottom -> top)".to_string(),
                 function: |editor, params, _forced| {
-                    Commands::search_command(editor, params[0], true);
+                    Commands::search_command(editor, &params.join(" "), true, false);
                 },
             },
         ];
@@ -65,27 +65,33 @@ impl Commands {
             commands: stock_commands,
         }
     }
-    pub fn search_command(editor: &mut Editor, query: &str, reverse: bool) {
-        Terminal::cursor_hide();
+    pub fn search_command(editor: &mut Editor, query: &str, reverse: bool, live_update: bool) {
         let positions: Vec<Position> = editor.document.find(query);
         let mut i: i8 = if reverse { positions.len() - 1 } else { 0 } as i8;
         let mut direction_just_jumped = 1;
         if positions.is_empty() {
-            editor.status_message = StatusMessage::from("No results found".to_string(), Option::from(crate::ERROR_COLOR));
+            if live_update {
+                editor.status_message = StatusMessage::from( format!("/{} - No results found", query), Option::from(crate::ERROR_COLOR));
+            } else {
+                editor.status_message = StatusMessage::from("No results found".to_string(), Option::from(crate::ERROR_COLOR));
+            }
+
             return;
         }
 
         loop {
-            editor.status_message = StatusMessage::from(format!("Search Mode - {}/{} (navigate = n / N)", i + 1, &positions.len()), None);
+            if !live_update {
+                editor.status_message = StatusMessage::from(format!("Search Mode - {}/{} (navigate = n / N)", i + 1, &positions.len()), None);
+            }
             if let Some(position) = positions.get(i as usize) {
                 let y: usize;
                 if direction_just_jumped == 1 {
-                   y = position.y + ((editor.terminal.size().height / 2) as usize);
+                    y = position.y + ((editor.terminal.size().height / 2) as usize);
                 } else {
                     y = position.y - ((editor.terminal.size().height / 2) as usize);
                 }
                 editor.cursor_position = Position{ x: position.x, y };
-                Editor::scroll(editor);
+                editor.scroll();
 
                 for p in &positions {
                     let row = editor.document.row_mut(p.y).unwrap();
@@ -98,10 +104,14 @@ impl Commands {
 
                     }
                 }
-
-                let _ = editor.refresh_screen();
-                editor.document.reset_highlighting();
             }
+
+            if live_update {
+                return;
+            }
+
+            let _ = editor.refresh_screen();
+            editor.document.reset_highlighting();
 
             match Terminal::read_key().unwrap() {
                 Key::Char('n') => {
@@ -118,7 +128,6 @@ impl Commands {
             }
             i = i.clamp(0, positions.len() as i8 - 1);
         }
-        Terminal::cursor_show();
         editor.status_message = StatusMessage::from("".to_string(), None);
     }
     pub fn get_command(&self, command_name: &String) -> Option<&Command> {
