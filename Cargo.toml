@@ -1,6 +1,6 @@
 [package]
 name = "lecturn"
-version = "0.1.5"
+version = "0.1.6"
 edition = "2018"
 authors = ["Noah Lavelle <noah.lavelle@gmail.com>"]
 license = "MIT OR Apache-2.0"

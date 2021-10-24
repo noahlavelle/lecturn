@@ -103,7 +103,6 @@ impl Commands {
                         } else {
                             row.add_highlighting(HighlightType::Search, c);
                         }
-
                     }
                 }
             }
@@ -112,7 +111,7 @@ impl Commands {
                 return;
             }
 
-            let _ = editor.refresh_screen();
+            let _ = editor.refresh_screen(true);
             editor.document.reset_highlighting();
 
             match Terminal::read_key().unwrap() {

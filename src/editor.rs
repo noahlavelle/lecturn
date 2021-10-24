@@ -58,7 +58,7 @@ impl Editor {
     pub fn run(&mut self) {
         Terminal::cursor_block();
         loop {
-            if let Err(error) = self.refresh_screen() {
+            if let Err(error) = self.refresh_screen(true) {
                 die(error);
             }
             if self.should_quit {
@@ -99,7 +99,7 @@ impl Editor {
         }
     }
 
-    pub(crate) fn refresh_screen(&mut self) -> Result<(), std::io::Error> {
+    pub(crate) fn refresh_screen(&mut self, show_cursor: bool) -> Result<(), std::io::Error> {
         Terminal::cursor_hide();
         Terminal::cursor_position(&Position::default());
         if self.should_quit {
@@ -116,7 +116,10 @@ impl Editor {
                 y: self.cursor_position.y.saturating_sub(self.offset.y).clamp(0, self.document.len() - 1),
             });
         }
-        Terminal::cursor_show();
+        if show_cursor {
+            Terminal::cursor_show();
+        }
+
         Terminal::flush()
     }
     pub fn save(&mut self) -> bool {
@@ -190,6 +193,8 @@ impl Editor {
                         Key::Char('l') => self.move_cursor(Key::Right),
                         Key::Char('h') => self.move_cursor(Key::Left),
                         Key::Char('H') => self.cursor_position.y = self.offset.y,
+                        Key::Char('M') => self.cursor_position.y = self.offset.y + ((self.terminal.size().height / 2) as usize) - 1,
+                        Key::Char('L') => self.cursor_position.y = self.offset.y + (self.terminal.size().height as usize) - 1,
                         _ => (),
                     }
                 } else {
@@ -404,9 +409,10 @@ impl Editor {
     {
         let mut result = String::new();
         loop {
+            Terminal::cursor_hide();
             self.status_message = StatusMessage::from(format!("{}{}", prompt, result), None);
             callback(self, &result);
-            self.refresh_screen()?;
+            self.refresh_screen(false)?;
 
             match Terminal::read_key()? {
                 Key::Backspace => {
