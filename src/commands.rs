@@ -84,14 +84,16 @@ impl Commands {
                 editor.status_message = StatusMessage::from(format!("Search Mode - {}/{} (navigate = n / N)", i + 1, &positions.len()), None);
             }
             if let Some(position) = positions.get(i as usize) {
-                let y: usize;
+                let mut y: usize;
                 if direction_just_jumped == 1 {
-                    y = position.y + ((editor.terminal.size().height / 2) as usize);
+                    y = position.y.saturating_add((editor.terminal.size().height / 2) as usize);
                 } else {
-                    y = position.y - ((editor.terminal.size().height / 2) as usize);
+                    y = position.y.saturating_sub((editor.terminal.size().height / 2) as usize);
                 }
+                y = y.clamp(0, editor.document.len());
                 editor.cursor_position = Position{ x: position.x, y };
                 editor.scroll();
+                editor.cursor_position = Position{ x: position.x, y: position.y };
 
                 for p in &positions {
                     let row = editor.document.row_mut(p.y).unwrap();
