@@ -1,4 +1,4 @@
-use crate::{Commands, Document};
+use crate::{Commands, Document, row};
 use crate::Row;
 use crate::Terminal;
 use std::env;
@@ -21,6 +21,7 @@ pub enum InteractionMode {
 }
 
 #[derive(Default)]
+#[non_exhaustive]
 pub struct Position {
     pub x: usize,
     pub y: usize,
@@ -59,19 +60,19 @@ impl Editor {
         Terminal::cursor_block();
         loop {
             if let Err(error) = self.refresh_screen(true) {
-                die(error);
+                die(&error);
             }
             if self.should_quit {
                 break;
             }
             if let Err(error) = self.process_keypress() {
-                die(error);
+                die(&error);
             }
         }
     }
     pub fn default() -> Self {
         let args: Vec<String> = env::args().collect();
-        let mut initial_status = StatusMessage::from("".to_string(), None);
+        let mut initial_status = StatusMessage::from("".to_owned(), None);
         let document = if let Some(file_name) = args.get(1) {
             let doc = Document::open(file_name);
             if let Ok(doc) = doc {
@@ -85,6 +86,7 @@ impl Editor {
             Document::default()
         };
 
+        #[allow(clippy::expect_used)]
         Self {
             should_quit: false,
             terminal: Terminal::default().expect("Failed to initialize terminal"),
@@ -112,8 +114,8 @@ impl Editor {
             self.document.reset_highlighting();
 
             Terminal::cursor_position(&Position {
-                x: self.cursor_position.x.saturating_sub(self.offset.x) + self.document.len().to_string().len() + 1,
-                y: self.cursor_position.y.saturating_sub(self.offset.y).clamp(0, self.document.len() - 1),
+                x: self.cursor_position.x.saturating_sub(self.offset.x).saturating_add(self.document.len().to_string().len()).saturating_add(1),
+                y: self.cursor_position.y.saturating_sub(self.offset.y).clamp(0, self.document.len().saturating_sub(1)),
             });
         }
         if show_cursor {
@@ -126,17 +128,17 @@ impl Editor {
         if self.document.file_name.is_none() {
             let new_name = self.prompt("Save as: ", |_, _|{}).unwrap_or(None);
             if new_name.is_none() {
-                self.status_message = StatusMessage::from("Save aborted.".to_string(), Option::from(crate::ERROR_COLOR));
+                self.status_message = StatusMessage::from("Save aborted.".to_owned(), Option::from(crate::ERROR_COLOR));
                 return false;
             }
             self.document.file_name = new_name;
         }
 
-        return if self.document.save().is_ok() {
-            self.status_message = StatusMessage::from("File saved successfully".to_string(), None);
+        if self.document.save().is_ok() {
+            self.status_message = StatusMessage::from("File saved successfully".to_owned(), None);
             true
         } else {
-            self.status_message = StatusMessage::from("ERR: could not write to file".to_string(), Option::from(crate::ERROR_COLOR));
+            self.status_message = StatusMessage::from("ERR: could not write to file".to_owned(), Option::from(crate::ERROR_COLOR));
             false
         }
     }
@@ -156,19 +158,17 @@ impl Editor {
                             Terminal::cursor_bar();
                         }
                         Key::Char(':') => {
-                            let command_name = self.prompt(":", |_, _|{}).unwrap_or(None);
-                            if command_name.is_none() {
-                                self.status_message = StatusMessage::from("ERR: Command aborted".to_string(), Option::from(crate::ERROR_COLOR));
-                                return Ok(());
-                            }
-                            let command_name = command_name.unwrap();
-                            let is_forced = command_name.contains("!");
-                            let command = self.command_handler.get_command(&command_name);
-                            if command.is_none() {
-                                self.status_message = StatusMessage::from("ERR: Invalid command".to_string(), Option::from(crate::ERROR_COLOR));
+                            if let Some(command_name) = self.prompt(":", |_, _|{})? {
+                                let is_forced = command_name.contains('!');
+                                if let Some(command) = self.command_handler.get_command(&command_name) {
+                                    let command_params = command.regex.replace(&command_name.clone(), "").to_string();
+                                    (command.function)(self, command_params.split(' ').collect(), is_forced);
+                                } else {
+                                    self.status_message = StatusMessage::from("ERR: Invalid command".to_owned(), Option::from(crate::ERROR_COLOR));
+                                }
                             } else {
-                                let command_params = command.unwrap().regex.replace(&command_name.to_string(), "").to_string();
-                                (command.unwrap().function)(self, command_params.split(" ").collect(), is_forced);
+                                self.status_message = StatusMessage::from("ERR: Command aborted".to_owned(), Option::from(crate::ERROR_COLOR));
+                                return Ok(());
                             }
                         },
                         Key::Char('/') => {
@@ -180,7 +180,7 @@ impl Editor {
                                 Commands::search_command(editor, result, false, true);
                             })?;
                             if self.interaction_mode == InteractionMode::Command {
-                                self.status_message = StatusMessage::from("ERR: Search Aborted".to_string(), Option::from(crate::ERROR_COLOR));
+                                self.status_message = StatusMessage::from("ERR: Search Aborted".to_owned(), Option::from(crate::ERROR_COLOR));
                             } else {
                                 self.interaction_mode = InteractionMode::Command;
                                 Commands::search_command(self, &query, false, false);
@@ -193,8 +193,9 @@ impl Editor {
                         Key::Char('l') => self.move_cursor(Key::Right),
                         Key::Char('h') => self.move_cursor(Key::Left),
                         Key::Char('H') => self.cursor_position.y = self.offset.y,
-                        Key::Char('M') => self.cursor_position.y = self.offset.y + ((self.terminal.size().height / 2) as usize) - 1,
-                        Key::Char('L') => self.cursor_position.y = self.offset.y + (self.terminal.size().height as usize) - 1,
+                        #[allow(clippy::integer_division)]
+                        Key::Char('M') => self.cursor_position.y = self.offset.y.saturating_add(usize::from(self.terminal.size().height / 2)).saturating_sub(1),
+                        Key::Char('L') => self.cursor_position.y = self.offset.y.saturating_add(usize::from(self.terminal.size().height).saturating_sub(1)),
                         _ => (),
                     }
                 } else {
@@ -228,8 +229,8 @@ impl Editor {
     }
     pub(crate) fn scroll(&mut self) {
         let Position { x, y } = self.cursor_position;
-        let width = self.terminal.size().width as usize;
-        let height = self.terminal.size().height as usize;
+        let width = usize::from(self.terminal.size().width);
+        let height = usize::from(self.terminal.size().height);
         let mut offset = &mut self.offset;
         if y < offset.y {
             offset.y = y;
@@ -243,14 +244,10 @@ impl Editor {
         }
     }
     fn move_cursor(&mut self, key: Key) {
-        let terminal_height = self.terminal.size().height as usize;
+        let terminal_height = usize::from(self.terminal.size().height);
         let Position { mut y, mut x } = self.cursor_position;
         let height = self.document.len();
-        let mut width = if let Some(row) = self.document.row(y) {
-            row.len()
-        } else {
-            0
-        };
+        let mut width = self.document.row(y).map_or(0, row::Row::len);
         match key {
             Key::Up => y = y.saturating_sub(1),
             Key::Down => {
@@ -260,9 +257,9 @@ impl Editor {
             }
             Key::Left => {
                 if x > 0 {
-                    x -= 1;
+                    x = x.saturating_sub(1);
                 } else if y > 0 {
-                    y -= 1;
+                    y = y.saturating_sub(1);
                     if let Some(row) = self.document.row(y) {
                         x = row.len();
                     } else {
@@ -272,9 +269,9 @@ impl Editor {
             }
             Key::Right => {
                 if x < width {
-                    x += 1;
+                    x = x.saturating_add(1);
                 } else if y < height {
-                    y += 1;
+                    y = y.saturating_add(1);
                     x = 0;
                 }
             }
@@ -296,11 +293,7 @@ impl Editor {
             Key::End => x = width,
             _ => (),
         }
-        width = if let Some(row) = self.document.row(y) {
-            row.len()
-        } else {
-            0
-        };
+        width = self.document.row(y).map_or(0, row::Row::len);
         if x > width {
             x = width;
         }
@@ -309,7 +302,7 @@ impl Editor {
     }
     fn draw_welcome_message(&self) {
         let mut welcome_message = format!("Lecturn v{}", VERSION);
-        let width = self.terminal.size().width as usize;
+        let width = usize::from(self.terminal.size().width);
         let len = welcome_message.len();
         #[allow(clippy::integer_arithmetic, clippy::integer_division)]
         let padding = width.saturating_sub(len) / 2;
@@ -319,11 +312,11 @@ impl Editor {
         println!("{}\r", welcome_message);
     }
     pub fn draw_row(&self, row: &Row) {
-        let width = self.terminal.size().width as usize;
+        let width = usize::from(self.terminal.size().width);
         let start = self.offset.x;
         let end = self.offset.x.saturating_add(width);
         let row = row.render(start, end);
-        println!("{}\r", row)
+        println!("{}\r", row);
     }
     #[allow(clippy::integer_arithmetic, clippy::integer_division)]
     fn draw_rows(&self) {
@@ -332,10 +325,10 @@ impl Editor {
             Terminal::clear_current_line();
             if let Some(row) = self
                 .document
-                .row(self.offset.y.saturating_add(terminal_row as usize))
+                .row(self.offset.y.saturating_add(usize::from(terminal_row)))
             {
                 Terminal::set_fg_color(Rgb(249, 241, 165));
-                let line_number = self.offset.y.saturating_add(terminal_row as usize + 1);
+                let line_number = self.offset.y.saturating_add(usize::from(terminal_row) + 1);
                 print!("{}{} ", " ".repeat(self.document.len().to_string().len() - line_number.to_string().len()), line_number);
                 Terminal::reset_fg_color();
                 self.draw_row(row);
@@ -349,13 +342,14 @@ impl Editor {
     }
     fn draw_status_bar(&self) {
         let mut status;
-        let width = self.terminal.size().width as usize;
+        let width = usize::from(self.terminal.size().width);
         let modified_indicator = if self.document.is_dirty() {
             " [+]"
         } else {
             ""
         };
-        let mut file_name = "[No Name]".to_string();
+        let mut file_name = "[No Name]".to_owned();
+        #[allow(clippy::pattern_type_mismatch)]
         if let Some(name) = &self.document.file_name {
             file_name = name.clone();
             file_name.truncate(20);
@@ -385,17 +379,17 @@ impl Editor {
     fn draw_message_bar(&mut self) {
         Terminal::clear_current_line();
         if self.interaction_mode == InteractionMode::Insert {
-            self.status_message = StatusMessage::from("-- INSERT --".to_string(), None);
-        } else if self.status_message.text == "-- INSERT --".to_string() {
-            self.status_message = StatusMessage::from("".to_string(), None);
+            self.status_message = StatusMessage::from("-- INSERT --".to_owned(), None);
+        } else if self.status_message.text == *"-- INSERT --" {
+            self.status_message = StatusMessage::from("".to_owned(), None);
         }
 
         let message = &self.status_message;
         if Instant::now() - message.time < Duration::new(5, 0) {
             let mut text = message.text.clone();
-            text.truncate(self.terminal.size().width as usize);
-            if !message.color.is_none() {
-                Terminal::set_bg_color(message.color.unwrap());
+            text.truncate(usize::from(self.terminal.size().width));
+            if let Some(color) = message.color {
+                Terminal::set_bg_color(color);
             }
             Terminal::set_fg_color(color::Rgb(255, 255, 255));
             print!("{}", text);
@@ -442,7 +436,7 @@ impl Editor {
     }
 }
 
-fn die(e: std::io::Error) {
+fn die(e: &std::io::Error) {
     Terminal::clear_screen();
     panic!("{}", e);
 }

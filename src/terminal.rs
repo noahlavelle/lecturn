@@ -16,6 +16,9 @@ pub struct Terminal {
 }
 
 impl Terminal {
+    /// # Errors
+    /// Will return `Err` if the `termion` dependency fails
+    /// to initiate raw mode
     pub fn default() -> Result<Self, std::io::Error> {
         let size = termion::terminal_size()?;
         Ok(Self {
@@ -26,25 +29,27 @@ impl Terminal {
             _stdout: stdout().into_raw_mode()?,
         })
     }
-    pub fn size(&self) -> &Size {
+    #[must_use] pub fn size(&self) -> &Size {
         &self.size
     }
     pub fn clear_screen() {
         print!("{}", termion::clear::All);
     }
 
-    #[allow(clippy::cast_possible_truncation)]
+    #[allow(clippy::cast_possible_truncation, clippy::as_conversions)]
     pub fn cursor_position(position: &Position) {
-        let Position { mut x, mut y } = position;
-        x = x.saturating_add(1);
-        y = y.saturating_add(1);
-        let x = x as u16;
-        let y = y as u16;
+        let &Position { x, y } = position;
+        let x: u16 = x.saturating_add(1) as u16;
+        let y: u16 = y.saturating_add(1) as u16;
         print!("{}", termion::cursor::Goto(x, y));
     }
+    /// # Errors
+    /// Will return `Err` if `stdout` fails to flush
     pub fn flush() -> Result<(), std::io::Error> {
         io::stdout().flush()
     }
+    /// # Errors
+    /// Will return `Err` if `stdin` fails to collect key presses
     pub fn read_key() -> Result<Key, std::io::Error> {
         loop {
             if let Some(key) = io::stdin().lock().keys().next() {

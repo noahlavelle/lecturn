@@ -20,6 +20,7 @@ impl From<&str> for Row {
 }
 
 impl Row {
+    #[must_use]
     pub fn render(&self, start: usize, end: usize) -> String {
         let end = cmp::min(end, self.string.len());
         let start = cmp::min(start, end);
@@ -62,24 +63,24 @@ impl Row {
         result.push_str(&end_highlight[..]);
         result
     }
-    pub fn len(&self) -> usize {
+    #[must_use] pub fn len(&self) -> usize {
         self.len
     }
-    pub fn is_empty(&self) -> bool {
+    #[must_use] pub fn is_empty(&self) -> bool {
         self.len == 0
     }
     pub fn insert(&mut self, at: usize, c: char) {
         if at >= self.len() {
             self.string.push(c);
-            self.len += 1;
+            self.len = self.len.saturating_add(1);
             return;
         }
         let mut result: String = String::new();
-        let mut length = 0;
+        let mut length: usize = 0;
         for (index, grapheme) in self.string[..].graphemes(true).enumerate() {
-            length += 1;
+            length = length.saturating_add(1);
             if index == at {
-                length += 1;
+                length = length.saturating_add(1);
                 result.push(c);
             }
             result.push_str(grapheme);
@@ -92,10 +93,10 @@ impl Row {
             return;
         }
         let mut result: String = String::new();
-        let mut length = 0;
+        let mut length: usize = 0;
         for (index, grapheme) in self.string[..].graphemes(true).enumerate() {
             if index != at {
-                length += 1;
+                length = length.saturating_add(1);
                 result.push_str(grapheme);
             }
         }
@@ -104,19 +105,19 @@ impl Row {
     }
     pub fn append(&mut self, new: &Self)  {
         self.string = format!("{}{}", self.string, new.string);
-        self.len += new.len;
+        self.len = self.len.saturating_add(new.len);
     }
     pub fn split(&mut self, at: usize) -> Self {
         let mut row: String = String::new();
-        let mut length = 0;
+        let mut length: usize = 0;
         let mut split_row: String = String::new();
-        let mut split_length = 0;
+        let mut split_length: usize = 0;
         for (index, grapheme) in self.string[..].graphemes(true).enumerate() {
             if index < at {
-                length += 1;
+                length = length.saturating_add(1);
                 row.push_str(grapheme);
             } else {
-                split_length += 1;
+                split_length = split_length.saturating_add(1);
                 split_row.push_str(grapheme);
             }
         }
@@ -129,16 +130,17 @@ impl Row {
             highlighting: vec!(),
         }
     }
-    pub fn find(&self, query: &str) -> Option<usize> {
+    #[must_use] pub fn find(&self, query: &str) -> Option<usize> {
         self.string.find(query)
     }
-    pub fn as_bytes(&self) -> &[u8] {
+    #[must_use] pub fn as_bytes(&self) -> &[u8] {
         self.string.as_bytes()
     }
+    #[allow(clippy::indexing_slicing)]
     pub fn add_highlighting(&mut self, highlight_type: highlighting::Type, index: usize) {
         self.highlighting[index] = highlight_type;
     }
     pub fn reset_highlighting(&mut self) {
-        self.highlighting = vec![highlighting::Type::None; self.string.len()]
+        self.highlighting = vec![highlighting::Type::None; self.string.len()];
     }
 }
