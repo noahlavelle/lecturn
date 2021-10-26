@@ -14,10 +14,10 @@ pub struct Highlight {
 
 impl Type {
     pub fn to_color(&self) -> Highlight {
-        match self {
+        match *self {
             Type::Search => Highlight { fg_color: Rgb(0, 0, 0), bg_color: Rgb(249, 241, 165) },
             Type::SearchSelected => Highlight { fg_color: Rgb(0, 0, 0), bg_color: Rgb(255, 255, 255) },
-            _ => Highlight { fg_color: Rgb(255, 255, 255), bg_color: Rgb(0, 0, 0) },
+            Type::None => Highlight { fg_color: Rgb(255, 255, 255), bg_color: Rgb(0, 0, 0) },
         }
     }
 }
