@@ -134,4 +134,7 @@ impl Document {
             }
         }
     }
+    pub fn set_file_name(&mut self, file_name: String) {
+        self.file_name = Option::from(file_name);
+    }
 }

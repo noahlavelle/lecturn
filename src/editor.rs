@@ -78,9 +78,11 @@ impl Editor {
             if let Ok(doc) = doc {
                 doc
             } else {
-                initial_status.text = format!("ERR: Could not open file: {}", file_name);
+                initial_status.text = format!("ERR: Could not open file (opening as new): {}", file_name);
                 initial_status.color = Option::from(crate::ERROR_COLOR);
-                Document::default()
+                let mut doc = Document::default();
+                doc.set_file_name(file_name.to_owned());
+                doc
             }
         } else {
             Document::default()
