@@ -314,7 +314,8 @@ impl Editor {
     pub fn draw_row(&self, row: &Row) {
         let width = usize::from(self.terminal.size().width);
         let start = self.offset.x;
-        let end = self.offset.x.saturating_add(width);
+        #[allow(clippy::integer_arithmetic)]
+        let end = self.offset.x + width - self.terminal.size().height.to_string().len();
         let row = row.render(start, end);
         println!("{}\r", row);
     }
